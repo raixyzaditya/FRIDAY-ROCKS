@@ -1,0 +1,10 @@
+Voice/Config.py
+friday_briefing.html
+friday_techstack_and_start.html
+# Python
+__pycache__/
+*.py[cod]
+
+# Environment / secrets
+.env
+Config.py
