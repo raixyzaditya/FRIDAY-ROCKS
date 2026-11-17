@@ -1,0 +1,13 @@
+id,category,command,tools_called,tool_selection_ok,latency_s,task_success,reply
+1,live info,What's the weather in Delhi?,,False,0.96,,I'm having trouble connecting to my brain right now.
+2,live info,Latest news about AI,,False,0.28,,I'm having trouble connecting to my brain right now.
+3,live info,Who is the CEO of Nvidia?,,False,0.55,,I'm having trouble connecting to my brain right now.
+4,app launch,Open Notepad,,False,0.58,,I'm having trouble connecting to my brain right now.
+5,app launch,Open Calculator,,False,0.44,,I'm having trouble connecting to my brain right now.
+6,file,Find a file named resume,,False,0.62,,I'm having trouble connecting to my brain right now.
+7,file,Create a folder called FridayTest in Documents,,False,1.58,,I'm having trouble connecting to my brain right now.
+8,system,Take a screenshot,,False,3.33,,I'm having trouble connecting to my brain right now.
+9,no tool,What is the capital of France?,,True,2.75,,I'm having trouble connecting to my brain right now.
+10,no tool,Tell me a joke,,True,1.15,,I'm having trouble connecting to my brain right now.
+11,multi-step,Search for AI news and then open Notepad,,False,0.98,,I'm having trouble connecting to my brain right now.
+12,multi-step,Take a screenshot and then open Chrome,,False,0.51,,I'm having trouble connecting to my brain right now.

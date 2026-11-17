@@ -1,148 +1,121 @@
-
 import sys
 import os
+import json
 
-from Config import HF_TOKEN
-from huggingface_hub import InferenceClient
+from Config import GROQ_API_KEY
+from openai import OpenAI
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-client = InferenceClient(api_key=HF_TOKEN,provider='auto')
+from Tools.ToolRegistry import TOOLS, run_tool
+
+client = OpenAI(api_key=GROQ_API_KEY, base_url="https://api.groq.com/openai/v1")
+MODEL = "openai/gpt-oss-120b"
 
 SYSTEM_PROMPT = """
 You are F.R.I.D.A.Y. — a highly intelligent personal AI assistant.
-You are very expert in physics, maths, chemistry, Laws, Computer science and general knowledge, automabiles like Mercedes, bmw, toyota and very much more. You are ultimate.
+You are very expert in physics, maths, chemistry, Laws, Computer science and general knowledge, automobiles like Mercedes, BMW, Toyota and very much more. You are ultimate.
 You were built by your user for their own personal use.
- 
+
 Your personality:
 - Smart, direct, and concise. No fluff.
 - You speak like a sharp, confident assistant — not a corporate chatbot.
 - You address the user casually. No "Certainly!" or "Of course!".
 - Keep responses short when spoken aloud (2-4 sentences max unless asked for more).
 - You can be witty but you always prioritise being useful.
- 
-Your capabilities right now (Phase 1):
-- Answer questions using your knowledge
-- Have a real conversation and remember context within this session
-- Access live information when it is provided by tools
+
+Your capabilities:
+- Answer questions using your knowledge and hold a conversation within this session
 - Help with coding, reasoning, planning, writing and general problem solving
+- Use tools: web search, news, weather, open apps, search files, take screenshots,
+  create folders, and move files (the user is asked to confirm moves)
 
-Future capabilities:
-- PC control
-- Advanced computer automation
-- Shopping assistance
-- Physical/home automation through Raspberry Pi and connected devices
-- You have access to live news, weather and search results when provided by the tools. When you have live data, you can use it to answer questions about current events, weather, or anything else. Always use the live data when it's available — it's more accurate and up-to-date than your training data.                       
+Tool rules:
+- Use a tool whenever the user asks for live information or wants something done on the PC.
+- For multi-step requests, call the tools one after another until everything is done.
+- Do not call a tool for things you can answer from knowledge.
+- Never claim you did something unless a tool result confirms it.
+- If a tool reports an error, tell the user plainly what went wrong.
 
-When given live data (news/weather/search results):
-- Summarise it naturally for speaking aloud — conversational, not robotic
+When you receive tool results (news/weather/search):
+- Summarise naturally for speaking aloud — conversational, not robotic
 - Don't read out bullet numbers like "1, 2, 3" — weave it into sentences
-- Always keep the user in mind - what would be most useful and interesting for them to hear?
- 
-Current limitations:
+- Focus on what is most useful and interesting for the user to hear
 
-- You cannot control the PC yet (coming in Phase 2)
- 
+Future capabilities: shopping assistance, home automation via Raspberry Pi.
+
 If asked something you don't know, say so directly — don't make things up.
 """
+
 MAX_HISTORY = 10
+MAX_TOOL_STEPS = 4
 conversation_history = []
 
-def detect_intent(user_input: str)->str:
-    t = user_input.lower()
-    news_keywords = [
-        "news",
-        "headlines",
-        "current events",
-        "latest news",
-        "news about",
-        "news on",
-        "what happened in the news"
-    ]
+LLM_TOOLS = [{"type": "function", "function": t} for t in TOOLS]
 
-    search_keywords = [
-        "search",
-        "search for",
-        "look up",
-        "find",
-        "google",
-        "who is",
-        "what is",
-        "how much",
-        "price",
-        "how to",
-        "best",
-        "review",
-        "compare",
-        "vs",
-        "difference",
-        "meaning",
-        "tell me about",
-        "score",
-        "match",
-        "cricket",
-        "football",
-        "sports",
-        "weather"
-    ]
 
-    if any(k in t for k in news_keywords):
-        return "news"
-    if any(k in t for k in search_keywords):
-        return "search"
+def _trim_history():
+    """Keep the last MAX_HISTORY messages, always starting on a user message."""
+    global conversation_history
+    conversation_history = conversation_history[-MAX_HISTORY:]
+    while conversation_history and conversation_history[0]["role"] != "user":
+        conversation_history.pop(0)
 
-    return None
 
-def ask_friday(question: str)-> str:
+def ask_friday(question: str) -> str:
     global conversation_history
     print(f"[Brain] User: {question}")
-    intent = detect_intent(question)
-    print(f"[Brain] Detected intent: {intent}")
-    live_data = None
-    if intent == "news":
-        try:
-            from Tools.News import handle_news_command
-            print("[Brain] Detected news intent. Fetching news...")
-            live_data = handle_news_command(question)
-        except Exception as e:
-            print(f"[Brain] News tool error: {str(e)}")
-    elif intent == "search":
-        try:
-            from Tools.WebSearch import handle_search_command
-            print("[Brain] Detected search intent. Performing web search...")
-            live_data = handle_search_command(question)
-        except Exception as e:
-            print(f"[Brain] Web search tool error: {str(e)}")
 
-    if live_data:
-        message_content = (
-            f"User asked: {question}\n\n"
-            f"Live data fetched: {live_data}\n\n"
-            f"Summarise this information in a natural, conversational way for speaking aloud. Be concise and engaging.  Don't just read out bullet points - weave it into sentences. Focus on what's most interesting and useful for the user to hear."
-        )
-    else:
-        message_content = question
-    conversation_history.append({"role":"user","content":message_content})
-    if len(conversation_history)>MAX_HISTORY:
-        conversation_history = conversation_history[-MAX_HISTORY:]
+    conversation_history.append({"role": "user", "content": question})
+    _trim_history()
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}, *conversation_history]
 
     try:
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            messages=[
-                {"role":"system","content": SYSTEM_PROMPT},
-                *conversation_history
-            ],
-            max_tokens = 300
-        )
-        reply = response.choices[0].message.content.strip()
-        conversation_history.append({"role":"assistant","content":reply})
+        for step in range(MAX_TOOL_STEPS):
+            response = client.chat.completions.create(
+                model=MODEL,
+                messages=messages,
+                tools=LLM_TOOLS,
+                tool_choice="auto",
+                max_tokens=400,
+            )
+            msg = response.choices[0].message
+
+            if not msg.tool_calls:
+                reply = (msg.content or "").strip()
+                break
+
+            messages.append({
+                "role": "assistant",
+                "content": msg.content or "",
+                "tool_calls": [
+                    {"id": tc.id, "type": "function",
+                     "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                    for tc in msg.tool_calls
+                ],
+            })
+            for tc in msg.tool_calls:
+                try:
+                    args = json.loads(tc.function.arguments or "{}")
+                except json.JSONDecodeError:
+                    args = {}
+                print(f"[Brain] Step {step + 1}: LLM chose tool '{tc.function.name}'")
+                result = run_tool(tc.function.name, args)
+                print(f"[Brain] Tool result: {result[:120]}")
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+        else:
+            reply = "Sorry boss, that took too many steps and I got stuck."
+
+        if not reply:
+            reply = "Sorry boss, I didn't get a proper answer. Try again."
+        conversation_history.append({"role": "assistant", "content": reply})
         return reply
-    
- 
+
     except Exception as e:
         print(f"[Brain] LLM error: {e}")
+        conversation_history.pop()  # drop the unanswered user message
         return "I'm having trouble connecting to my brain right now."
+
+
 def clear_memory():
-    
     global conversation_history
     conversation_history = []
     print("[Brain] Memory cleared.")
