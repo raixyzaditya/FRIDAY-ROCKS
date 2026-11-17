@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "friday-assistant"
+version = "1.0.0"
+description = "F.R.I.D.A.Y. - a voice-first personal AI assistant for Windows"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "openai>=1.35",
+    "openai-whisper",
+    "sounddevice",
+    "numpy",
+    "scipy",
+    "pyttsx3",
+    "requests",
+    "ddgs",
+    "mss",
+    "pillow",
+]
+
+[project.optional-dependencies]
+google = ["google-api-python-client", "google-auth-oauthlib"]
+elevenlabs = ["elevenlabs", "pygame"]
+google-wake = ["SpeechRecognition", "pyaudio"]
+
+[project.scripts]
+friday = "friday_cli:main"
+
+[tool.setuptools]
+# Friday's voice modules live in Voice/ and import each other by plain name, so friday_cli adds that folder
+# to the path. Install with `pip install -e .` (install.bat does this) so the project folder stays in place.
+py-modules = ["friday_cli"]
+packages = ["Tools"]

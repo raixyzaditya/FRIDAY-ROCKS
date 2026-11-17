@@ -8,3 +8,17 @@ __pycache__/
 # Environment / secrets
 .env
 Config.py
+friday_memory.json
+friday_reminders.json
+friday_state.json
+google_credentials.json
+google_token.json
+friday_mail_log.json
+friday_contacts.json
+Voice/friday_results.csv
+
+# Packaging / environments
+.venv/
+*.egg-info/
+build/
+dist/

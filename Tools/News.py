@@ -29,7 +29,13 @@ SEARCH_TRIGGERS = [
     "what's happening with"
 ]
 
+NEWS_NOT_SET_UP = ("Sorry boss, news isn't set up yet. Add your Guardian or NewsAPI key "
+                   "to Config.py and I'll be able to read you the headlines.")
+
+
 def guardian_search(query: str=None, section: str=None)->str:
+    if not GAURDIAN_API_KEY:
+        return None  # no key: let the caller fall back to NewsAPI
     params = {
         "api-key":GAURDIAN_API_KEY,
         "page-size":6,
@@ -60,6 +66,8 @@ def guardian_search(query: str=None, section: str=None)->str:
 
 
 def get_top_headlines_from_NewsAPI(category:str=None,country:str='us')->str:
+    if not NEWS_API_KEY:
+        return "Sorry boss, I couldn't fetch the news right now"
     params = {
         "apiKey": NEWS_API_KEY,
         "country":country,
@@ -85,6 +93,8 @@ def get_top_headlines_from_NewsAPI(category:str=None,country:str='us')->str:
         return "Sorry boss, something went wrong while fetching the news. Please try again later."
 
 def search_news(query:str)-> str:
+    if not NEWS_API_KEY:
+        return "Sorry boss, I couldn't fetch the news right now"
     params = {
         "apiKey": NEWS_API_KEY,
         "q":query,
@@ -112,6 +122,8 @@ def search_news(query:str)-> str:
         return "Sorry boss, something went wrong while fetching the news. Please try again later."
     
 def handle_news_command(command:str)->str:
+    if not GAURDIAN_API_KEY and not NEWS_API_KEY:
+        return NEWS_NOT_SET_UP
     text = command.lower()
     for trigger in SEARCH_TRIGGERS:
         if trigger in text:
